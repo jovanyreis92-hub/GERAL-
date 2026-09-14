@@ -1,0 +1,7 @@
+{
+  "name": "Registro de Participantes e Credenciamento QR",
+  "description": "Aplicativo para cadastro de participantes e eventos por datas, geração e download de QR Code individual, controle de presença via leitor de câmera, painel administrativo com PIN e exportação em PDF e Excel.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

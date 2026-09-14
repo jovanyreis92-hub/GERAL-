@@ -1,0 +1,14 @@
+[
+  {
+    "id": "part-1789424580244-4b65k",
+    "name": "jovany reis matias",
+    "matricula": "1234",
+    "company": "neffa",
+    "createdAt": "2026-09-14T22:23:00.244Z",
+    "checkedIn": false,
+    "checkInTime": null,
+    "eventId": "evt-101",
+    "eventName": "Seminário de Inovação & Tecnologia 2026",
+    "eventDate": "2026-09-14"
+  }
+]
