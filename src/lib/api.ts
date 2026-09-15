@@ -32,9 +32,9 @@ function saveLocalBrandingBackup(data: CompanyBranding): void {
 
 function getLocalAdminPassword(): string {
   try {
-    return localStorage.getItem(ADMIN_PASS_STORAGE_KEY) || '1234';
+    return localStorage.getItem(ADMIN_PASS_STORAGE_KEY) || '123456';
   } catch {
-    return '1234';
+    return '123456';
   }
 }
 
@@ -421,9 +421,35 @@ export async function scanCheckIn(rawCode: string): Promise<{
   } catch (err: any) {
     // Fallback search in local backup
     const clean = rawCode.trim();
+    let targetId: string | null = null;
+    let targetMatricula: string | null = null;
+
+    if (
+      clean.includes('http://') ||
+      clean.includes('https://') ||
+      clean.includes('?checkin=') ||
+      clean.includes('&checkin=') ||
+      clean.includes('/checkin/')
+    ) {
+      try {
+        const urlObj = new URL(clean, 'http://localhost:3000');
+        const pId = urlObj.searchParams.get('checkin') || urlObj.searchParams.get('id');
+        if (pId) targetId = pId.trim();
+        const pM = urlObj.searchParams.get('m') || urlObj.searchParams.get('matricula');
+        if (pM) targetMatricula = pM.trim();
+      } catch {
+        const match = clean.match(/[?&](?:checkin|id)=([^&]+)/i);
+        if (match) targetId = decodeURIComponent(match[1]).trim();
+        const mMatch = clean.match(/[?&](?:m|matricula)=([^&]+)/i);
+        if (mMatch) targetMatricula = decodeURIComponent(mMatch[1]).trim();
+      }
+    }
+
     const current = getLocalBackup();
     let found = current.find(
       (p) =>
+        (targetId && p.id === targetId) ||
+        (targetMatricula && p.matricula.toLowerCase() === targetMatricula.toLowerCase()) ||
         p.id === clean ||
         p.matricula.toLowerCase() === clean.toLowerCase() ||
         clean.includes(p.matricula) ||

@@ -210,9 +210,9 @@ export const QRScannerView: React.FC<QRScannerViewProps> = ({
       ctx.drawImage(video, 0, 0, width, height);
       const imageData = ctx.getImageData(0, 0, width, height);
 
-      // Analyze with jsQR
+      // Analyze with jsQR (attemptBoth allows reading standard and dark/inverted phone screens)
       const qrCode = jsQR(imageData.data, imageData.width, imageData.height, {
-        inversionAttempts: 'dontInvert',
+        inversionAttempts: 'attemptBoth',
       });
 
       if (qrCode && qrCode.data) {

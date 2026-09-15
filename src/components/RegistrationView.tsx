@@ -1,8 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { User, Hash, Building2, QrCode, Download, CheckCircle, ArrowRight, Sparkles, RefreshCw, AlertCircle, Calendar, Plus, Pencil } from 'lucide-react';
+import {
+  User,
+  Hash,
+  Building2,
+  QrCode,
+  Download,
+  CheckCircle,
+  ArrowRight,
+  Sparkles,
+  RefreshCw,
+  AlertCircle,
+  Calendar,
+  Plus,
+  Pencil,
+  Copy,
+  Check,
+  Smartphone,
+} from 'lucide-react';
 import { Participant, EventItem } from '../types';
 import { registerParticipant } from '../lib/api';
-import { generateQRDataUrl, downloadQRCodeOnly, downloadParticipantBadge, buildQRPayload } from '../lib/qr';
+import {
+  generateQRDataUrl,
+  downloadQRCodeOnly,
+  downloadParticipantBadge,
+  buildQRPayload,
+  getParticipantDirectUrl,
+} from '../lib/qr';
 import { EditParticipantModal } from './EditParticipantModal';
 
 interface RegistrationViewProps {
@@ -26,6 +49,7 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
   const [targetEventId, setTargetEventId] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   useEffect(() => {
     if (selectedEventId && selectedEventId !== 'all') {
@@ -75,6 +99,19 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
       setErrorMessage(err.message || 'Erro ao registrar participante. Verifique se a matrícula já não existe.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    if (!registeredUser) return;
+    try {
+      const url = getParticipantDirectUrl(registeredUser);
+      await navigator.clipboard.writeText(url);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    } catch {
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
     }
   };
 
@@ -163,18 +200,48 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
                 <span>Matrícula:</span>
                 <strong>{registeredUser.matricula}</strong>
               </div>
+
+              {/* Mobile reading badge */}
+              <div className="mt-3 p-2.5 bg-emerald-50 border border-emerald-200/80 rounded-xl text-center w-full">
+                <div className="flex items-center justify-center gap-1.5 text-emerald-800 text-xs font-bold">
+                  <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Leitura Ativa em Qualquer Celular (4G/5G/Wi-Fi)</span>
+                </div>
+                <p className="text-[10px] text-emerald-700 mt-0.5 leading-snug">
+                  Qualquer smartphone pode escanear com a própria câmera para registrar a presença.
+                </p>
+              </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="w-full max-w-sm mt-6 space-y-3">
+            <div className="w-full max-w-sm mt-6 space-y-2.5">
+              {/* Copy link to WhatsApp */}
+              <button
+                id="btn-copy-mobile-link"
+                onClick={handleCopyLink}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-xs shadow-xs transition-colors cursor-pointer"
+              >
+                {copiedLink ? (
+                  <>
+                    <Check className="w-4 h-4 text-white" />
+                    <span>Link Copiado para a Área de Transferência!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    <span>Copiar Link para Enviar pelo WhatsApp</span>
+                  </>
+                )}
+              </button>
+
               {/* Tecla para baixar o código qr (Explicit User Requirement) */}
               <button
                 id="btn-download-qr-code"
                 onClick={handleDownloadQR}
                 disabled={downloading}
-                className="w-full flex items-center justify-center gap-2.5 px-5 py-3.5 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 disabled:opacity-50 text-white font-bold rounded-xl shadow-md transition-all cursor-pointer"
+                className="w-full flex items-center justify-center gap-2.5 px-5 py-3 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 disabled:opacity-50 text-white font-bold rounded-xl shadow-md transition-all cursor-pointer text-sm"
               >
-                <Download className="w-5 h-5" />
+                <Download className="w-4 h-4" />
                 <span>Baixar Código QR (PNG)</span>
               </button>
 

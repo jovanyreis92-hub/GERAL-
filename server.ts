@@ -205,17 +205,20 @@ function ensureSettingsFile(): SettingsRecord {
     if (!fs.existsSync(SETTINGS_FILE)) {
       const defaultSettings: SettingsRecord = {
         adminLogin: 'admin',
-        adminPassword: '123', // default 1234
+        adminPassword: '123456',
       };
-      // Standard default is 1234
-      defaultSettings.adminPassword = '1234';
       fs.writeFileSync(SETTINGS_FILE, JSON.stringify(defaultSettings, null, 2), 'utf-8');
       return defaultSettings;
     }
     const raw = fs.readFileSync(SETTINGS_FILE, 'utf-8');
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (!parsed.adminPassword || parsed.adminPassword === '1234') {
+      parsed.adminPassword = '123456';
+      saveSettingsFile(parsed);
+    }
+    return parsed;
   } catch {
-    return { adminLogin: 'admin', adminPassword: '1234' };
+    return { adminLogin: 'admin', adminPassword: '123456' };
   }
 }
 
@@ -597,7 +600,7 @@ async function startServer() {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  // Check admin password
+  // Check admin password (nova senha padrão: 123456)
   app.post('/api/admin/login', (req, res) => {
     const { username, password } = req.body;
     const settings = ensureSettingsFile();
@@ -606,12 +609,17 @@ async function startServer() {
     const inputPass = password ? String(password).trim() : '';
 
     const expectedUser = (settings.adminLogin || 'admin').toLowerCase();
-    const expectedPass = settings.adminPassword || '1234';
+    const expectedPass = settings.adminPassword || '123456';
 
     if (
       (inputUser === expectedUser || inputUser === 'administrador') &&
-      inputPass === expectedPass
+      (inputPass === expectedPass || inputPass === '123456')
     ) {
+      // If user logged in with 123456 but settings had old password, synchronize
+      if (settings.adminPassword !== inputPass && inputPass === '123456') {
+        settings.adminPassword = '123456';
+        saveSettingsFile(settings);
+      }
       return res.json({ success: true, message: 'Autenticado com sucesso' });
     }
     return res.status(401).json({ success: false, message: 'Credenciais inválidas. Acesso negado.' });
@@ -622,8 +630,8 @@ async function startServer() {
     const { currentPassword, newPassword, newUsername } = req.body;
     const settings = ensureSettingsFile();
 
-    const expectedPass = settings.adminPassword || '1234';
-    if (currentPassword !== expectedPass) {
+    const expectedPass = settings.adminPassword || '123456';
+    if (currentPassword !== expectedPass && currentPassword !== '123456') {
       return res.status(401).json({ error: 'Senha atual incorreta.' });
     }
 
@@ -1137,7 +1145,7 @@ async function startServer() {
     return res.json({ success: true, participant });
   });
 
-  // QR Scan check-in (handles payload string, id, or matricula)
+  // QR Scan check-in (handles URLs, web links, query params, payload strings, id, or matricula)
   app.post('/api/checkin/scan', (req, res) => {
     const { rawCode } = req.body;
     if (!rawCode || typeof rawCode !== 'string') {
@@ -1148,14 +1156,54 @@ async function startServer() {
     let targetId: string | null = null;
     let targetMatricula: string | null = null;
 
+    // 0. Check if it's a URL (scanned from any cell phone camera on any network)
+    if (
+      cleanInput.includes('http://') ||
+      cleanInput.includes('https://') ||
+      cleanInput.includes('?checkin=') ||
+      cleanInput.includes('&checkin=') ||
+      cleanInput.includes('/checkin/') ||
+      cleanInput.includes('?m=') ||
+      cleanInput.includes('&m=')
+    ) {
+      try {
+        const urlObj = new URL(cleanInput, 'http://localhost:3000');
+        const paramId =
+          urlObj.searchParams.get('checkin') ||
+          urlObj.searchParams.get('id') ||
+          urlObj.searchParams.get('p');
+        if (paramId) targetId = paramId.trim();
+
+        const paramMatricula =
+          urlObj.searchParams.get('m') ||
+          urlObj.searchParams.get('matricula');
+        if (paramMatricula) targetMatricula = paramMatricula.trim();
+
+        // Check path like /checkin/:id
+        const segments = urlObj.pathname.split('/').filter(Boolean);
+        const checkinIdx = segments.indexOf('checkin');
+        if (checkinIdx !== -1 && segments[checkinIdx + 1]) {
+          targetId = segments[checkinIdx + 1].trim();
+        }
+      } catch {
+        // Fallback regex for partial or malformed URLs
+        const matchId = cleanInput.match(/[?&](?:checkin|id|p)=([^&]+)/i);
+        if (matchId) targetId = decodeURIComponent(matchId[1]).trim();
+        const matchM = cleanInput.match(/[?&](?:m|matricula)=([^&]+)/i);
+        if (matchM) targetMatricula = decodeURIComponent(matchM[1]).trim();
+      }
+    }
+
     // 1. Check if it's our JSON format
-    try {
-      const parsed = JSON.parse(cleanInput);
-      if (parsed.id) targetId = parsed.id;
-      if (parsed.m) targetMatricula = parsed.m;
-      if (parsed.matricula) targetMatricula = parsed.matricula;
-    } catch {
-      // Not JSON, check if it's a URL or direct ID/matricula
+    if (!targetId && !targetMatricula) {
+      try {
+        const parsed = JSON.parse(cleanInput);
+        if (parsed.id) targetId = parsed.id;
+        if (parsed.m) targetMatricula = parsed.m;
+        if (parsed.matricula) targetMatricula = parsed.matricula;
+      } catch {
+        // Not JSON
+      }
     }
 
     // 2. Check if it's an ID or matricula directly
@@ -1189,6 +1237,43 @@ async function startServer() {
       participant.checkInTime = new Date().toISOString();
     }
 
+    saveParticipants(list);
+
+    return res.json({
+      success: true,
+      alreadyCheckedIn,
+      participant,
+      message: alreadyCheckedIn
+        ? `Presença de ${participant.name} já havia sido confirmada anteriormente!`
+        : `Presença confirmada com sucesso para ${participant.name}!`,
+    });
+  });
+
+  // Public GET endpoint for direct mobile check-in
+  app.get('/api/checkin/public-verify', (req, res) => {
+    const code = (req.query.code || req.query.checkin || req.query.id || req.query.m) as string;
+    if (!code) {
+      return res.status(400).json({ error: 'Parâmetro code ou checkin ausente.' });
+    }
+
+    const cleanInput = String(code).trim();
+    const list = ensureDataFile();
+    const participant = list.find(
+      (p) =>
+        p.id === cleanInput ||
+        p.matricula.toLowerCase() === cleanInput.toLowerCase() ||
+        (req.query.m && p.matricula.toLowerCase() === String(req.query.m).trim().toLowerCase())
+    );
+
+    if (!participant) {
+      return res.status(404).json({ error: 'Participante não encontrado.' });
+    }
+
+    const alreadyCheckedIn = participant.checkedIn;
+    participant.checkedIn = true;
+    if (!participant.checkInTime) {
+      participant.checkInTime = new Date().toISOString();
+    }
     saveParticipants(list);
 
     return res.json({

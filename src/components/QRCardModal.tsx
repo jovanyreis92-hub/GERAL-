@@ -1,17 +1,46 @@
 import React, { useEffect, useState } from 'react';
-import { X, Download, QrCode, CheckCircle2, Building, Hash, User, Printer, Calendar, Building2, Pencil } from 'lucide-react';
+import {
+  X,
+  Download,
+  QrCode,
+  CheckCircle2,
+  Building,
+  Hash,
+  User,
+  Printer,
+  Calendar,
+  Building2,
+  Pencil,
+  Copy,
+  Check,
+  Smartphone,
+  ExternalLink,
+} from 'lucide-react';
 import { Participant } from '../types';
-import { generateQRDataUrl, downloadParticipantBadge, downloadQRCodeOnly, buildQRPayload } from '../lib/qr';
+import {
+  generateQRDataUrl,
+  downloadParticipantBadge,
+  downloadQRCodeOnly,
+  buildQRPayload,
+  getParticipantDirectUrl,
+} from '../lib/qr';
 
 interface QRCardModalProps {
   participant: Participant | null;
   onClose: () => void;
   onEdit?: (participant: Participant) => void;
+  onDirectCheckIn?: (participant: Participant) => void;
 }
 
-export const QRCardModal: React.FC<QRCardModalProps> = ({ participant, onClose, onEdit }) => {
+export const QRCardModal: React.FC<QRCardModalProps> = ({
+  participant,
+  onClose,
+  onEdit,
+  onDirectCheckIn,
+}) => {
   const [qrSrc, setQrSrc] = useState<string>('');
   const [downloading, setDownloading] = useState<boolean>(false);
+  const [copiedLink, setCopiedLink] = useState<boolean>(false);
 
   useEffect(() => {
     if (!participant) return;
@@ -20,6 +49,19 @@ export const QRCardModal: React.FC<QRCardModalProps> = ({ participant, onClose, 
   }, [participant]);
 
   if (!participant) return null;
+
+  const handleCopyLink = async () => {
+    try {
+      const url = getParticipantDirectUrl(participant);
+      await navigator.clipboard.writeText(url);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    } catch {
+      // Fallback
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    }
+  };
 
   const handleDownloadQR = async () => {
     try {
@@ -127,18 +169,59 @@ export const QRCardModal: React.FC<QRCardModalProps> = ({ participant, onClose, 
             )}
           </div>
 
-          <p className="text-xs text-slate-500 text-center mt-2 max-w-xs">
-            Apresente este código no leitor de celular para confirmar sua presença no evento.
-          </p>
+          {/* Compatibility Badge */}
+          <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200/80 rounded-xl text-center w-full">
+            <div className="flex items-center justify-center gap-1.5 text-emerald-800 text-xs font-bold">
+              <Smartphone className="w-4 h-4 text-emerald-600" />
+              <span>Leitura Ativa em Qualquer Celular</span>
+            </div>
+            <p className="text-[11px] text-emerald-700 mt-1 leading-snug">
+              Basta apontar a câmera do celular (iOS ou Android) em qualquer rede (4G, 5G ou Wi-Fi) para confirmar a presença instantaneamente.
+            </p>
+          </div>
 
           {/* Action Buttons */}
-          <div className="w-full mt-6 space-y-2.5">
+          <div className="w-full mt-4 space-y-2">
+            {/* Copy direct link button */}
+            <button
+              id="btn-modal-copy-mobile-link"
+              onClick={handleCopyLink}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-xs shadow-xs transition-colors cursor-pointer"
+            >
+              {copiedLink ? (
+                <>
+                  <Check className="w-4 h-4 text-white" />
+                  <span>Link Copiado para a Área de Transferência!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4" />
+                  <span>Copiar Link para Enviar pelo WhatsApp</span>
+                </>
+              )}
+            </button>
+
+            {/* Test check-in button if callback exists */}
+            {onDirectCheckIn && (
+              <button
+                id="btn-modal-test-mobile-checkin"
+                onClick={() => {
+                  onClose();
+                  onDirectCheckIn(participant);
+                }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-sky-50 hover:bg-sky-100 text-sky-800 font-semibold rounded-xl border border-sky-200 text-xs transition-colors cursor-pointer"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-sky-600" />
+                <span>Simular / Testar Leitura Móvel Agora</span>
+              </button>
+            )}
+
             {/* Download QR Code button (Primary requested requirement) */}
             <button
               id="btn-modal-download-qr-only"
               onClick={handleDownloadQR}
               disabled={downloading || !qrSrc}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white font-semibold rounded-xl shadow-xs transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-semibold rounded-xl shadow-xs transition-colors text-xs cursor-pointer"
             >
               <Download className="w-4 h-4" />
               <span>Baixar Código QR (PNG)</span>
@@ -149,7 +232,7 @@ export const QRCardModal: React.FC<QRCardModalProps> = ({ participant, onClose, 
               id="btn-modal-download-badge"
               onClick={handleDownloadBadge}
               disabled={downloading || !qrSrc}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-800 font-medium rounded-xl transition-colors text-sm cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-800 font-medium rounded-xl transition-colors text-xs cursor-pointer"
             >
               <QrCode className="w-4 h-4 text-slate-600" />
               <span>Baixar Crachá Completo com Dados</span>

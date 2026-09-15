@@ -423,6 +423,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              <div className="flex items-center justify-between mt-1.5 px-0.5 text-[11px] text-slate-500">
+                <span>Senha padrão: <strong className="font-mono text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded text-xs">123456</strong></span>
+                <button
+                  type="button"
+                  onClick={() => setPasswordInput('123456')}
+                  className="text-sky-600 hover:text-sky-800 font-semibold cursor-pointer hover:underline"
+                >
+                  Preencher 123456
+                </button>
+              </div>
             </div>
 
             {authError && (

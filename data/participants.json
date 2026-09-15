@@ -5,10 +5,10 @@
     "matricula": "1234",
     "company": "neffa",
     "createdAt": "2026-09-14T22:23:00.244Z",
-    "checkedIn": false,
-    "checkInTime": null,
-    "eventId": "evt-101",
-    "eventName": "Seminário de Inovação & Tecnologia 2026",
-    "eventDate": "2026-09-14"
+    "checkedIn": true,
+    "checkInTime": "2026-09-14T23:43:18.173Z",
+    "eventId": "evt-103",
+    "eventName": "COZINHA SHOW",
+    "eventDate": "2026-09-25"
   }
 ]

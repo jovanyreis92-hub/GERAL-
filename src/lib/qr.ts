@@ -2,19 +2,47 @@ import QRCode from 'qrcode';
 import { Participant, QRPayload } from '../types';
 
 /**
- * Creates the standardized payload string stored inside the participant's QR code.
+ * Returns the public base URL of the application.
+ * Defaults to window.location.origin (e.g. deployed Cloud Run domain),
+ * ensuring the generated QR code can be read by ANY smartphone camera
+ * on ANY cellular network (4G, 5G, Wi-Fi).
+ */
+export function getAppPublicBaseUrl(): string {
+  if (typeof window !== 'undefined' && window.location) {
+    const custom = localStorage.getItem('qr_custom_public_base_url');
+    if (custom && custom.trim().startsWith('http')) {
+      return custom.trim().replace(/\/$/, '');
+    }
+    const origin = window.location.origin;
+    if (origin) {
+      return origin.replace(/\/$/, '');
+    }
+  }
+  return '';
+}
+
+/**
+ * Creates the universal URL string stored inside the participant's QR code.
+ * When scanned by ANY cell phone camera (iOS Camera, Android Google Lens/Camera, etc.)
+ * in ANY mobile network, it immediately opens the check-in confirmation page and records attendance.
+ * It is also 100% backward compatible with the in-app scanner.
  */
 export function buildQRPayload(p: Participant): string {
-  const payload: QRPayload = {
-    v: 1,
-    id: p.id,
-    m: p.matricula,
-    n: p.name,
-    c: p.company,
-    e: p.eventName,
-    ed: p.eventDate,
-  };
-  return JSON.stringify(payload);
+  const baseUrl = getAppPublicBaseUrl();
+  const cleanId = encodeURIComponent(p.id);
+  const cleanMatricula = encodeURIComponent(p.matricula);
+
+  if (baseUrl) {
+    return `${baseUrl}/?checkin=${cleanId}&m=${cleanMatricula}`;
+  }
+  return `?checkin=${cleanId}&m=${cleanMatricula}`;
+}
+
+/**
+ * Get the direct public check-in URL for sharing via WhatsApp or SMS
+ */
+export function getParticipantDirectUrl(p: Participant): string {
+  return buildQRPayload(p);
 }
 
 /**
@@ -188,11 +216,11 @@ export async function downloadParticipantBadge(p: Participant): Promise<void> {
   ctx.fillStyle = '#64748b';
   ctx.font = '500 13px "Plus Jakarta Sans", sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('Apresente este código na entrada do evento para validar a presença.', width / 2, cardY + 595);
+  ctx.fillText('Aponte a câmera de qualquer celular (4G/5G/Wi-Fi) ou leitor para validar.', width / 2, cardY + 595);
 
   ctx.fillStyle = '#94a3b8';
   ctx.font = '500 11px monospace';
-  ctx.fillText(`ID: ${p.id}`, width / 2, cardY + 625);
+  ctx.fillText(`ID: ${p.id} • LEITURA EM QUALQUER CELULAR E REDE`, width / 2, cardY + 625);
 
   // Bottom brand note
   ctx.fillStyle = '#cbd5e1';
